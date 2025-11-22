@@ -13,12 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef USE_CV_BRIDGE_HPP
-#include <cv_bridge/cv_bridge.hpp>
-#else
-#include <cv_bridge/cv_bridge.h>
-#endif
-
 #include <yaml-cpp/yaml.h>
 
 #include <cmath>
@@ -30,6 +24,7 @@
 #include <rclcpp/serialization.hpp>
 #include <rclcpp/serialized_message.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
 #include <rosbag2_cpp/reader.hpp>
 #include <rosbag2_cpp/readers/sequential_reader.hpp>
 #include <sstream>
@@ -59,7 +54,7 @@ using ImageConstPtr = Image::ConstSharedPtr;
 using CompressedImage = sensor_msgs::msg::CompressedImage;
 using CompressedImageConstPtr = CompressedImage::ConstSharedPtr;
 using TransformStamped = geometry_msgs::msg::TransformStamped;
-using Point = apriltag_msgs::msg::Point;
+using Point = geometry_msgs::msg::Point;
 using PoseStamped = geometry_msgs::msg::PoseStamped;
 using std::fixed;
 using std::setprecision;
@@ -194,7 +189,6 @@ void TagSLAM::readParams()
   fixedFrame_ = declare_parameter<string>("fixed_frame_id", "map");
   maxFrameNum_ = declare_parameter<int>("max_number_of_frames", 0);
   publishAck_ = declare_parameter<bool>("publish_ack", false);
-  useIsaacApriltag_ = declare_parameter<bool>("use_isaac_apriltag", false);
 }
 
 static YAML::Node readConfig(
@@ -284,42 +278,21 @@ void TagSLAM::subscribe()
 {
   std::vector<std::vector<std::string>> topics = makeTopics();
 
-  if (useIsaacApriltag_) {
-    // Subscribe to Isaac ROS AprilTag messages
-    LOG_INFO("using Isaac ROS AprilTag interfaces");
-    if (useApproximateSync_) {
-      isaacLiveApproxSync_.reset(new IsaacLiveApproxSync(
-        node_, topics,
-        std::bind(
-          &TagSLAM::isaacSyncCallback, this, std::placeholders::_1,
-          std::placeholders::_2),
-        syncQueueSize_));
-    } else {
-      isaacLiveExactSync_.reset(new IsaacLiveExactSync(
-        node_, topics,
-        std::bind(
-          &TagSLAM::isaacSyncCallback, this, std::placeholders::_1,
-          std::placeholders::_2),
-        syncQueueSize_));
-    }
+  LOG_INFO("using Isaac ROS AprilTag interfaces");
+  if (useApproximateSync_) {
+    liveApproxSync_.reset(new LiveApproxSync(
+      node_, topics,
+      std::bind(
+        &TagSLAM::syncCallback, this, std::placeholders::_1,
+        std::placeholders::_2),
+      syncQueueSize_));
   } else {
-    // Subscribe to standard apriltag_msgs messages
-    LOG_INFO("using standard apriltag_msgs");
-    if (useApproximateSync_) {
-      liveApproxSync_.reset(new LiveApproxSync(
-        node_, topics,
-        std::bind(
-          &TagSLAM::syncCallback, this, std::placeholders::_1,
-          std::placeholders::_2),
-        syncQueueSize_));
-    } else {
-      liveExactSync_.reset(new LiveExactSync(
-        node_, topics,
-        std::bind(
-          &TagSLAM::syncCallback, this, std::placeholders::_1,
-          std::placeholders::_2),
-        syncQueueSize_));
-    }
+    liveExactSync_.reset(new LiveExactSync(
+      node_, topics,
+      std::bind(
+        &TagSLAM::syncCallback, this, std::placeholders::_1,
+        std::placeholders::_2),
+      syncQueueSize_));
   }
 }
 
@@ -709,43 +682,6 @@ void TagSLAM::syncCallback(
   profiler_.reset("processTagsAndOdom");
   processTagsAndOdom(msgvec1, msgvec3);
   profiler_.record("processTagsAndOdom");
-}
-
-// Isaac ROS AprilTag callback - converts to apriltag_msgs format
-void TagSLAM::isaacSyncCallback(
-  const std::vector<IsaacTagArrayConstPtr> & msgvec1,
-  const std::vector<OdometryConstPtr> & msgvec3)
-{
-  // Convert Isaac ROS messages to apriltag_msgs format
-  std::vector<TagArrayConstPtr> converted_msgs;
-  converted_msgs.reserve(msgvec1.size());
-  for (const auto & isaac_msg : msgvec1) {
-    converted_msgs.push_back(convertIsaacToApriltagMsg(isaac_msg));
-  }
-  // Call the standard callback with converted messages
-  syncCallback(converted_msgs, msgvec3);
-}
-
-// Convert Isaac ROS AprilTag message to apriltag_msgs format
-TagSLAM::TagArrayPtr TagSLAM::convertIsaacToApriltagMsg(
-  const IsaacTagArrayConstPtr & isaac_msg)
-{
-  auto apriltag_msg = std::make_shared<TagArray>();
-  apriltag_msg->header = isaac_msg->header;
-
-  apriltag_msg->detections.reserve(isaac_msg->detections.size());
-  for (const auto & isaac_det : isaac_msg->detections) {
-    Apriltag apriltag_det;
-    apriltag_det.family = isaac_det.family;
-    apriltag_det.id = isaac_det.id;
-    apriltag_det.size = isaac_det.size;
-    apriltag_det.center = isaac_det.center;
-    apriltag_det.corners = isaac_det.corners;
-    apriltag_det.pose = isaac_det.pose;
-    apriltag_msg->detections.push_back(apriltag_det);
-  }
-
-  return apriltag_msg;
 }
 
 static Odometry make_odom(
@@ -1230,12 +1166,6 @@ void TagSLAM::remapAndSquash(
     p->header.stamp = rosTime(t);
     const auto sq = squash_[i].find(t);
     for (const auto & tag : o->detections) {
-      if (tag.hamming > maxHammingDistance_) {
-        LOG_WARN(
-          "dropped tag " << tag.id << " with hamming dist: " << tag.hamming
-                         << " > " << maxHammingDistance_);
-        continue;
-      }
       if (sq != squash_[i].end() && sq->second.count(tag.id) != 0) {
         LOG_INFO("time " << t << " squashed tag: " << tag.id);
       } else {

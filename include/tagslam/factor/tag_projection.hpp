@@ -16,7 +16,7 @@
 #ifndef TAGSLAM__FACTOR__TAG_PROJECTION_HPP_
 #define TAGSLAM__FACTOR__TAG_PROJECTION_HPP_
 
-#include <apriltag_msgs/msg/april_tag_detection.hpp>
+#include <geometry_msgs/msg/point.hpp>
 #include <tagslam/factor/factor.hpp>
 #include <tagslam/geometry.hpp>
 #include <tagslam/pose_with_noise.hpp>
@@ -36,7 +36,7 @@ public:
     uint64_t t = 0,
     const std::shared_ptr<const Camera> & cam = std::shared_ptr<Camera>(),
     const std::shared_ptr<const Tag> & tag = std::shared_ptr<Tag>(),
-    const apriltag_msgs::msg::Point * imgCorn = NULL, double pixelNoise = 1.0,
+    const geometry_msgs::msg::Point * imgCorn = NULL, double pixelNoise = 1.0,
     const string & name = "");
   // ------ inherited methods -----
   string getLabel() const override;

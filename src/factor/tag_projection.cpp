@@ -27,7 +27,7 @@ namespace factor
 TagProjection::TagProjection(
   uint64_t t, const std::shared_ptr<const Camera> & cam,
   const std::shared_ptr<const Tag> & tag,
-  const apriltag_msgs::msg::Point * imgCorn, double pxn, const string & name)
+  const geometry_msgs::msg::Point * imgCorn, double pxn, const string & name)
 : Factor(name, t), cam_(cam), tag_(tag), pixelNoise_(pxn)
 {
   imgCorners_ << imgCorn[0].x, imgCorn[0].y, imgCorn[1].x, imgCorn[1].y,

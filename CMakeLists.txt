@@ -31,11 +31,8 @@ find_package(Boost REQUIRED COMPONENTS graph)
 find_package(GTSAM REQUIRED)
 
 set(tagslam_ament_dependencies
-  "apriltag_msgs"
   "isaac_ros_apriltag_interfaces"
-  "cv_bridge"
   "geometry_msgs"
-  "image_transport"
   "flex_sync"
   "nav_msgs"
   "rclcpp"
@@ -49,33 +46,9 @@ set(tagslam_ament_dependencies
   "rosgraph_msgs"
   "std_srvs")
 
-set(sync_and_detect_ament_dependencies
-  "apriltag_msgs"
-  "isaac_ros_apriltag_interfaces"
-  "apriltag_detector"
-  "cv_bridge"
-  "flex_sync"
-  "image_transport"
-  "pluginlib"
-  "nav_msgs"
-  "rclcpp"
-  "sensor_msgs")
-
-set(all_ament_dependencies
-  ${tagslam_ament_dependencies}
-  ${sync_and_detect_ament_dependencies})
-
-foreach(pkg ${all_ament_dependencies})
+foreach(pkg ${tagslam_ament_dependencies})
   find_package(${pkg} REQUIRED)
 endforeach()
-
-if(${cv_bridge_VERSION} GREATER "3.3.0")
-  add_definitions(-DUSE_CV_BRIDGE_HPP)
-endif()
-
-if(${image_transport_VERSION} VERSION_GREATER_EQUAL "6.3.0")
-  add_definitions(-DIMAGE_TRANSPORT_USE_QOS)
-endif()
 
 #
 # --------- library
@@ -144,67 +117,6 @@ target_include_directories(${PROJECT_NAME}_node PRIVATE include)
 target_compile_features(${PROJECT_NAME}_node PRIVATE cxx_std_17)
 
 #
-# -------- sync-and-detect shared library
-#
-add_library(sync_and_detect SHARED
-  src/sync_and_detect.cpp
-)
-ament_target_dependencies(sync_and_detect ${sync_and_detect_ament_dependencies})
-target_link_libraries(sync_and_detect yaml-cpp)
-target_compile_features(sync_and_detect PRIVATE cxx_std_17)
-
-target_include_directories(
-    sync_and_detect
-  PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>)
-
-rclcpp_components_register_nodes(sync_and_detect "${PROJECT_NAME}::SyncAndDetect")
-
-#
-# -------- processing from bag
-#
-# NOTE: Disabled for ROS2 Humble compatibility
-# The rosbag2_transport::Player API used by these executables (play_next(), get_publishers())
-# is only available in ROS2 Jazzy and later.
-# For bag playback on Humble, use: ros2 bag play <bag_file>
-# and run the online nodes (tagslam_node, sync_and_detect_node) separately.
-#
-# add_executable(${PROJECT_NAME}_from_bag
-#   src/${PROJECT_NAME}_from_bag.cpp
-#   src/enhanced_player.cpp)
-# ament_target_dependencies(${PROJECT_NAME}_from_bag
-#   ${tagslam_ament_dependencies}
-#   rosbag2_transport)
-# target_link_libraries(${PROJECT_NAME}_from_bag ${PROJECT_NAME} sync_and_detect)
-# target_include_directories(${PROJECT_NAME}_from_bag PRIVATE include)
-# target_compile_features(${PROJECT_NAME}_from_bag PRIVATE cxx_std_17)
-
-#
-# -------- sync-and-detect from bag
-#
-# NOTE: Disabled for ROS2 Humble compatibility (same reason as above)
-#
-# add_executable(sync_and_detect_from_bag
-#   src/sync_and_detect_from_bag.cpp
-#   src/enhanced_player.cpp)
-# ament_target_dependencies(sync_and_detect_from_bag rosbag2_transport)
-# target_link_libraries(sync_and_detect_from_bag sync_and_detect yaml-cpp)
-#
-# target_include_directories(sync_and_detect_from_bag PRIVATE include)
-# target_compile_features(sync_and_detect_from_bag PRIVATE cxx_std_17)
-
-#
-# -------- sync-and-detect node
-#
-
-add_executable(sync_and_detect_node src/sync_and_detect_node.cpp)
-target_link_libraries(sync_and_detect_node sync_and_detect)
-
-target_include_directories(sync_and_detect_node PRIVATE include)
-target_compile_features(sync_and_detect_node PRIVATE cxx_std_17)
-
-#
 # --------------------- installation -----------------------------
 #
 # the node must go into the project specific lib directory or else
@@ -212,9 +124,6 @@ target_compile_features(sync_and_detect_node PRIVATE cxx_std_17)
 
 install(TARGETS
   ${PROJECT_NAME}_node
-  # ${PROJECT_NAME}_from_bag  # Disabled for Humble compatibility
-  sync_and_detect_node
-  # sync_and_detect_from_bag  # Disabled for Humble compatibility
   DESTINATION lib/${PROJECT_NAME}/)
 
 # the shared library goes into the global lib dir so it can
@@ -222,7 +131,6 @@ install(TARGETS
 
 install(TARGETS
   ${PROJECT_NAME}
-  sync_and_detect
   DESTINATION lib
 )
 install(PROGRAMS
