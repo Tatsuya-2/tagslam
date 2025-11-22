@@ -7,8 +7,10 @@ ROS2 is WORK IN PROGRESS. Documentation will follow.
 
 ## Platforms supported
 
-At the moment TagSLAM requires ROS2 Rolling/Jazzy or newer.
-Older versions of ROS2 lack some important rosbag2 features.
+TagSLAM supports ROS2 Humble and newer.
+
+**Note for ROS2 Humble users:**
+The `*_from_bag` executables (tagslam_from_bag, sync_and_detect_from_bag) are disabled on Humble due to rosbag2 API limitations. Instead, use the standard `ros2 bag play` command to play bags and run the online nodes separately. See the "How to use" section for details.
 
 ## How to build
 
@@ -44,27 +46,44 @@ It will use the ``cameras.yaml`` file to determine what topics to read from the 
 (MIT vs UMich), and what output tag topics to use. The ``tagslam.yaml`` file is searched for bodies with odometry topics.
 
 
-Here is how to run it from a bag:
+**For ROS2 Jazzy/Rolling:** Run it from a bag:
 ```
 ros2 run tagslam sync_and_detect_from_bag --ros-args -p "cameras:=./cameras.yaml" -p "tagslam_config:=./tagslam.yaml" -p "in_bag:=name_of_input_bag" -p "out_bag:=./tag_bag"
 ```
 
-For online operation, launch a ``sync_and_detect`` node like this:
+**For ROS2 Humble:** Use separate bag playback and online node:
+```bash
+# Terminal 1: Play the bag
+ros2 bag play --clock <bag_file>
+
+# Terminal 2: Run sync_and_detect node
+ros2 launch tagslam sync_and_detect.launch.py use_sim_time:=True cameras:=./cameras.yaml tagslam_config:=./tagslam.yaml
+```
+
+For online operation (live sensors), launch a ``sync_and_detect`` node like this:
 ```
 ros2 launch tagslam sync_and_detect.launch.py use_sim_time:=<True/False> cameras:=<path_to_cameras.yaml_file> tagslam_config:=<path_to_tagslam_config_file> use_approximate_sync:=<True/False>
 ```
 
 ### TagSLAM
 
-TagSLAM can run off a rosbag, or as a node. When running off a bag, TagSLAM will automatically recognize when there are only
-image topics, but no tag topics in the rosbag, and will start ``sync_and_detect`` to do tag detection.
+TagSLAM can run off a rosbag, or as a node.
 
-Run TagSLAM from a rosbag like this:
+**For ROS2 Jazzy/Rolling:** Run TagSLAM from a rosbag like this:
 ```
 ros2 run tagslam tagslam_from_bag --ros-args -p "cameras:=./cameras.yaml" -p "tagslam_config:=./tagslam.yaml" -p "camera_poses:=./camera_poses.yaml" -p "in_bag:=./bag_with_tags_and_odom" -p "out_bag:=./out_bag"
 ```
 
-For online operation, launch a ``tagslam`` node like this:
+**For ROS2 Humble:** Use separate bag playback and online node:
+```bash
+# Terminal 1: Play the bag
+ros2 bag play --clock <bag_file>
+
+# Terminal 2: Run tagslam node
+ros2 launch tagslam tagslam.launch.py use_sim_time:=True cameras:=./cameras.yaml camera_poses:=./camera_poses.yaml tagslam_config:=./tagslam.yaml
+```
+
+For online operation (live sensors), launch a ``tagslam`` node like this:
 ```
 ros2 launch tagslam tagslam.launch.py use_sim_time:=<True/False> cameras:=<path_to_cameras.yaml_file> camera_poses:=<path_to_camera_poses.yaml file> tagslam_config:=<path_to_tagslam_config_file> use_approximate_sync:=<True/False>
 ```

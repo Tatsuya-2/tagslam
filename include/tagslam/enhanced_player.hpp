@@ -16,6 +16,10 @@
 #ifndef TAGSLAM__ENHANCED_PLAYER_HPP_
 #define TAGSLAM__ENHANCED_PLAYER_HPP_
 
+// NOTE: This class is currently unused on ROS2 Humble due to rosbag2_transport API limitations.
+// It is preserved for future compatibility with ROS2 Jazzy/Rolling.
+// The methods play_next() and get_publishers() used by this class are only available in Jazzy+.
+
 #include <rosbag2_transport/player.hpp>
 #include <utility>
 

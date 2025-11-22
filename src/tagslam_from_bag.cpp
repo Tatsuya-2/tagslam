@@ -13,6 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// NOTE: This executable is disabled on ROS2 Humble due to rosbag2_transport::Player API limitations.
+// For Humble, use: ros2 bag play <bag_file> (in terminal 1)
+//              and ros2 launch tagslam tagslam.launch.py use_sim_time:=True ... (in terminal 2)
+// This file is preserved for future compatibility with ROS2 Jazzy/Rolling.
+
 #include <filesystem>
 #include <rosbag2_transport/recorder.hpp>
 #include <tagslam/enhanced_player.hpp>

@@ -23,6 +23,8 @@
 #endif
 #include <apriltag_msgs/msg/april_tag_detection.hpp>
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
+#include <isaac_ros_apriltag_interfaces/msg/april_tag_detection.hpp>
+#include <isaac_ros_apriltag_interfaces/msg/april_tag_detection_array.hpp>
 #include <flex_sync/approximate_sync.hpp>
 #include <flex_sync/exact_sync.hpp>
 #include <flex_sync/live_sync.hpp>
@@ -64,6 +66,8 @@ class TagSLAM : public TagFactory, public rclcpp::Node
   using TagArray = apriltag_msgs::msg::AprilTagDetectionArray;
   using TagArrayPtr = TagArray::SharedPtr;
   using TagArrayConstPtr = TagArray::ConstSharedPtr;
+  using IsaacTagArray = isaac_ros_apriltag_interfaces::msg::AprilTagDetectionArray;
+  using IsaacTagArrayConstPtr = IsaacTagArray::ConstSharedPtr;
   using Odometry = nav_msgs::msg::Odometry;
   using OdometryConstPtr = Odometry::ConstSharedPtr;
   using Image = sensor_msgs::msg::Image;
@@ -78,6 +82,11 @@ class TagSLAM : public TagFactory, public rclcpp::Node
   using ApproxSync = flex_sync::ApproximateSync<TagArray, Odometry>;
   using LiveExactSync = flex_sync::LiveSync<ExactSync>;
   using LiveApproxSync = flex_sync::LiveSync<ApproxSync>;
+
+  using IsaacExactSync = flex_sync::ExactSync<IsaacTagArray, Odometry>;
+  using IsaacApproxSync = flex_sync::ApproximateSync<IsaacTagArray, Odometry>;
+  using IsaacLiveExactSync = flex_sync::LiveSync<IsaacExactSync>;
+  using IsaacLiveApproxSync = flex_sync::LiveSync<IsaacApproxSync>;
 
   using PoseCacheMap = std::map<
     string, PoseWithNoise, std::less<string>,
@@ -118,6 +127,10 @@ private:
   void syncCallback(
     const std::vector<TagArrayConstPtr> & msgvec1,
     const std::vector<OdometryConstPtr> & msgvec3);
+  void isaacSyncCallback(
+    const std::vector<IsaacTagArrayConstPtr> & msgvec1,
+    const std::vector<OdometryConstPtr> & msgvec3);
+  TagArrayPtr convertIsaacToApriltagMsg(const IsaacTagArrayConstPtr & isaac_msg);
   void testForOldLaunchParameters();
   void readParams();
   void readBodies(const YAML::Node & config);
@@ -235,6 +248,9 @@ private:
   string inBagFile_;
   std::shared_ptr<LiveExactSync> liveExactSync_;
   std::shared_ptr<LiveApproxSync> liveApproxSync_;
+  std::shared_ptr<IsaacLiveExactSync> isaacLiveExactSync_;
+  std::shared_ptr<IsaacLiveApproxSync> isaacLiveApproxSync_;
+  bool useIsaacApriltag_{false};
 
   std::unordered_map<int, std::vector<ReMap>> tagRemap_;
   std::vector<std::map<uint64_t, std::set<int>>> squash_;

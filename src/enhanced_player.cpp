@@ -13,6 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// NOTE: This file is currently unused on ROS2 Humble due to rosbag2_transport API limitations.
+// It is preserved for future compatibility with ROS2 Jazzy/Rolling.
+
 #include <tagslam/enhanced_player.hpp>
 #include <tagslam/logging.hpp>
 
