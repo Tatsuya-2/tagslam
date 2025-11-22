@@ -427,6 +427,12 @@ void TagSLAM::readGlobalParameters(const YAML::Node & config)
     yaml::parse<int>(config["tagslam_parameters"], "sync_queue_size", 100);
   minTagArea_ =
     yaml::parse<int>(config["tagslam_parameters"], "minimum_tag_area", 0);
+  maxHammingDistance_ = yaml::parse<int>(config, "max_hamming_distance", 100);
+  if (maxHammingDistance_ != 100) {
+    LOG_WARN(
+      "max_hamming_distance is configured but ignored because "
+      "isaac_ros_apriltag_interfaces does not provide a hamming field.");
+  }
   if (defbody.empty()) {
     LOG_WARN("no default body specified!");
   } else {
@@ -447,7 +453,6 @@ void TagSLAM::readGlobalParameters(const YAML::Node & config)
   if (amnesia_) {
     LOG_INFO("using amnesia!");
   }
-  maxHammingDistance_ = yaml::parse<int>(config, "max_hamming_distance", 100);
 }
 
 void TagSLAM::readCameraPoses(const YAML::Node & config)
