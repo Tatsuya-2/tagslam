@@ -37,7 +37,10 @@ def launch_setup(context, *args, **kwargs):
                      "tagslam_config": LaunchConfig("tagslam_config"),
                      "use_sim_time": LaunchConfig("use_sim_time"),
                      "use_approximate_sync": LaunchConfig("use_approximate_sync")}],
-        remappings=[],
+        remappings=[
+            ('/odom/body_drone', '/odom/stage3_camera_slam'),
+            ('/path/body_drone', '/path/stage3_camera_slam'),
+        ],
     )
     return [node]
 
