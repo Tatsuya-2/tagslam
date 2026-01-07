@@ -45,6 +45,9 @@
 
 const int QSZ = 1000;
 
+// Sensor QoS for real-time data (BEST_EFFORT - drop old, use latest)
+static rclcpp::QoS sensor_qos(rclcpp::SensorDataQoS().keep_last(QSZ));
+
 namespace tagslam
 {
 using Odometry = nav_msgs::msg::Odometry;
@@ -409,9 +412,9 @@ void TagSLAM::readBodies(const YAML::Node & config)
       }
       nonstaticBodies_.push_back(body);
       odomPub_.push_back(
-        node_->create_publisher<Odometry>("odom/body_" + body->getName(), QSZ));
+        node_->create_publisher<Odometry>("odom/body_" + body->getName(), sensor_qos));
       pathPub_.push_back(
-        node_->create_publisher<Path>("path/body_" + body->getName(), QSZ));
+        node_->create_publisher<Path>("path/body_" + body->getName(), sensor_qos));
       trajectory_.push_back(Path());
     }
   }
