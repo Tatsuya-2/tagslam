@@ -214,26 +214,28 @@ void SyncAndDetect::subscribe(
   const bool use_approx_sync =
     declare_parameter<bool>("use_approximate_sync", true);
   LOG_INFO("using approximate sync: " << (use_approx_sync ? "YES" : "NO"));
-  const int qs = 10;  // queue size
+  // Use RELIABLE QoS to match video_receiver publisher
+  rclcpp::QoS qos(10);
+  qos.reliable();
   if (odom_topics.empty()) {
     if (use_approx_sync) {
       image_approx_sync_ = std::make_shared<ImageApproxSync>(
         this, svecvec({imgs}),
-        std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
+        std::bind(&SyncAndDetect::callbackImage, this, _1), qos);
     } else {
       image_exact_sync_ = std::make_shared<ImageExactSync>(
         this, svecvec({imgs}),
-        std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
+        std::bind(&SyncAndDetect::callbackImage, this, _1), qos);
     }
   } else {
     if (use_approx_sync) {
       image_odom_approx_sync_ = std::make_shared<ImageAndOdomApproxSync>(
         this, svecvec({imgs, odom_topics}),
-        std::bind(&SyncAndDetect::callbackImageAndOdom, this, _1, _2), qs);
+        std::bind(&SyncAndDetect::callbackImageAndOdom, this, _1, _2), qos);
     } else {
       image_odom_exact_sync_ = std::make_shared<ImageAndOdomExactSync>(
         this, svecvec({imgs, odom_topics}),
-        std::bind(&SyncAndDetect::callbackImageAndOdom, this, _1, _2), qs);
+        std::bind(&SyncAndDetect::callbackImageAndOdom, this, _1, _2), qos);
     }
   }
 }
