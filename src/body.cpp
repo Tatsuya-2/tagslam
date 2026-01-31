@@ -70,6 +70,7 @@ bool Body::parseCommon(const YAML::Node & body)
       yaml::parse<double>(body, "odom_translation_noise", -1.0);
     odomRotationNoise_ = yaml::parse<double>(body, "odom_rotation_noise", -1.0);
     publishCovariance_ = yaml::parse<bool>(body, "publish_covariance", true);
+    publishTf_ = yaml::parse<bool>(body, "publish_tf", true);
     // first read old tag, then new one if provided
     const double oanm = yaml::parse<double>(body, "odom_acceleration", 5.0);
     odomAccelerationNoiseMin_ =

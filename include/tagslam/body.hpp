@@ -96,6 +96,7 @@ public:
   }
   bool isStatic() const { return (isStatic_); }
   bool publishCovariance() const { return (publishCovariance_); }
+  bool publishTf() const { return (publishTf_); }
 
   // setters
 
@@ -132,6 +133,7 @@ protected:
   int id_{-1};
   bool isStatic_{true};
   bool publishCovariance_{true};
+  bool publishTf_{true};
   string type_;
   int maxHammingDistance_{2};
   TagMap tags_;                  // tags that are hanging off of it

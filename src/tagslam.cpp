@@ -628,11 +628,15 @@ void TagSLAM::publishTagAndBodyTransforms(uint64_t t, TFMessage * tfMsg)
     const string & bodyFrameId = body->getFrameId();
     const uint64_t ts = body->isStatic() ? 0 : t;
     if (graph_utils::get_optimized_pose(*graph_, ts, *body, &bodyTF)) {
-      const auto btf = to_tftf(rosTime(t), bodyTF, fixedFrame_, bodyFrameId);
-      tfMsg->transforms.push_back(btf);
-      if (!writeToBag_) {
-        tfBroadcaster_->sendTransform(btf);
+      // Only publish body TF if publish_tf is true
+      if (body->publishTf()) {
+        const auto btf = to_tftf(rosTime(t), bodyTF, fixedFrame_, bodyFrameId);
+        tfMsg->transforms.push_back(btf);
+        if (!writeToBag_) {
+          tfBroadcaster_->sendTransform(btf);
+        }
       }
+      // Tag TFs are published regardless of body's publish_tf setting
       for (const auto & tag : body->getTags()) {
         Transform tagTF;
         if (graph_utils::get_optimized_pose(*graph_, *tag, &tagTF)) {
