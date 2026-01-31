@@ -38,10 +38,10 @@ def launch_setup(context, *args, **kwargs):
                      "use_sim_time": LaunchConfig("use_sim_time"),
                      "use_approximate_sync": LaunchConfig("use_approximate_sync")}],
         remappings=[
-            # Remap TagSLAM's auto-generated topic names to our pipeline convention
+            # Remap TagSLAM's auto-generated topic names to simplified naming
             # TagSLAM generates: /odom/body_<body_name> where body_name is "camera_body"
-            ('/odom/body_camera_body', '/odom/stage3_camera_slam'),
-            ('/path/body_camera_body', '/path/stage3_camera_slam'),
+            ('/odom/body_camera_body', '/tagslam/odom'),
+            ('/path/body_camera_body', '/tagslam/path'),
         ],
     )
     return [node]
