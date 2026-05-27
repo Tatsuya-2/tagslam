@@ -23,8 +23,7 @@ pose as `/tagslam/odom`. No odometry is fed in.
   `SensorDataQoS` (BEST_EFFORT, KEEP_LAST 1000).
 - The `*_from_bag` executables and the `sync_and_detect` node are not
   built in this fork; only `tagslam_node` is compiled (see
-  `CMakeLists.txt`). The `launch/sync_and_detect.launch.py` file ships
-  unused and will fail because `sync_and_detect_node` is not built.
+  `CMakeLists.txt`).
 
 ## Executable & Launch
 

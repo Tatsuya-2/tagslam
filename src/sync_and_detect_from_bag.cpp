@@ -14,8 +14,7 @@
 // limitations under the License.
 
 // NOTE: This executable is disabled on ROS2 Humble due to rosbag2_transport::Player API limitations.
-// For Humble, use: ros2 bag play <bag_file> (in terminal 1)
-//              and ros2 launch tagslam sync_and_detect.launch.py use_sim_time:=True ... (in terminal 2)
+// The companion sync_and_detect launch file has been removed.
 // This file is preserved for future compatibility with ROS2 Jazzy/Rolling.
 
 #include <rosbag2_transport/recorder.hpp>
