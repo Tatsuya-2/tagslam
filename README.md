@@ -45,10 +45,23 @@ pose as `/tagslam/odom`. No odometry is fed in.
 | `use_sim_time`         | `False`          | Use `/clock` (`True` when replaying a bag)          |
 | `use_approximate_sync` | `True`           | Approximate vs. exact `flex_sync` for inputs        |
 
-The launch file passes all four through to `tagslam_node` parameters.
-Additional node parameters declared by the source: `outbag`, `playback_rate`,
-`output_directory`, `fixed_frame_id` (default `map`), `max_number_of_frames`,
-`publish_ack`.
+The launch file passes the five arguments above through to `tagslam_node`
+parameters. Additional node parameters declared in the source
+(`TagSLAM::readParams`, `tagslam.cpp`) — these are **not** exposed as
+launch arguments and use their code defaults unless overridden:
+
+| Parameter              | Type   | Default     | Use                                                        |
+| ---------------------- | ------ | ----------- | ---------------------------------------------------------- |
+| `outbag`               | string | `out.bag`   | Output bag written during `dump`                           |
+| `playback_rate`        | double | `5.0`       | Wall-rate multiplier used by the `replay` service          |
+| `output_directory`     | string | `.`         | Where `dump` writes `poses.yaml`, `calibration.yaml`, `camera_poses.yaml`, `error_map.txt`, `tag_diagnostics.txt`, `time_diagnostics.txt` |
+| `fixed_frame_id`       | string | `map`       | `frame_id` of published odom/path and the TF fixed frame   |
+| `max_number_of_frames` | int    | `0`         | If `>0`, auto-finalize after this many frames (0 = run forever) |
+| `publish_ack`          | bool   | `false`     | If true, create the `/acknowledge` publisher and echo each processed header |
+
+`cameras`, `camera_poses`, and `tagslam_config` are also declared as
+string parameters and must point at valid YAML files (`tagslam_config`
+and `cameras` are mandatory; `camera_poses` may be empty).
 
 ## Pure SLAM Mode
 
@@ -59,11 +72,14 @@ Additional node parameters declared by the source: `outbag`, `playback_rate`,
   TagSLAM (the `camera_body` body has no `odom_topic` configured, so no
   `OdometryProcessor` is instantiated).
 - The single non-static body `camera_body` represents the camera. Its
-  optimized pose is published as `/tagslam/odom` after the launch remap.
+  optimized pose is published on `odom/body_camera_body` (remapped to
+  `/tagslam/odom`) with `frame_id=map`; `child_frame_id` is empty because
+  `camera_body` has no `odom_frame_id` in `tagslam.yaml`.
 - The single static body `indoor_lab` carries the known floor tags.
 - `body.publish_tf: false` on `camera_body` — TagSLAM does **not**
-  broadcast a `map → camera_body` TF. Tag TFs (`map → tag_<id>`) are
-  always broadcast.
+  broadcast a `map → camera_body` TF. Tag TFs (`<body_frame> → tag_<id>`,
+  parent `indoor_lab` for the floor tags) and the camera extrinsic TF
+  (`camera_body → cam0`) are always broadcast regardless of `publish_tf`.
 - Downstream: `/tagslam/odom` → `pose_corrector` → `/odom/drone` →
   `odometry_fuser` → `/odom/fused` → flight_controller / flight_planner /
   gimbal_controller.
@@ -83,33 +99,41 @@ or `/odom` topic is consumed in Pure SLAM Mode.
 
 | Topic            | Type                | QoS                                  | Notes                                          |
 | ---------------- | ------------------- | ------------------------------------ | ---------------------------------------------- |
-| `/tagslam/odom`  | `nav_msgs/Odometry` | BEST_EFFORT, VOLATILE, KEEP_LAST 1000 (`SensorDataQoS`) | `frame_id=map`, `child_frame_id=camera_body`   |
-| `/tagslam/path`  | `nav_msgs/Path`     | BEST_EFFORT, VOLATILE, KEEP_LAST 1000 | Trajectory of `camera_body`                    |
-| `/acknowledge`   | `std_msgs/Header`   | RELIABLE, depth 10                    | Only if `publish_ack:=true` (default false)    |
-| TF: `map → tag_<id>` | `tf2_msgs/TFMessage` | TF default                       | Per-tag TFs are always broadcast               |
+| `/odom/body_camera_body` → remapped to `/tagslam/odom` | `nav_msgs/Odometry` | BEST_EFFORT, VOLATILE, KEEP_LAST 1000 (`SensorDataQoS`) | `frame_id=map` (`fixed_frame_id`); `child_frame_id` = body's `odom_frame_id`, which is **empty** for `camera_body` (no `odom_frame_id` set in `tagslam.yaml`). Base topic is `odom/body_<body_name>`, remapped to `/tagslam/odom` in `tagslam.launch.py`. |
+| `/path/body_camera_body` → remapped to `/tagslam/path` | `nav_msgs/Path`     | BEST_EFFORT, VOLATILE, KEEP_LAST 1000 (`SensorDataQoS`) | Trajectory of `camera_body`; `header.frame_id=map`. Base topic is `path/body_<body_name>`, remapped to `/tagslam/path`. |
+| `/acknowledge`   | `std_msgs/Header`   | depth 10 (default RELIABLE)           | Created only if `publish_ack:=true` (default false) |
+| TF: `<body_frame> → tag_<id>` | `tf2_msgs/TFMessage` | `tf2_ros::TransformBroadcaster` default | Per-tag TFs are always broadcast, regardless of the body's `publish_tf` (parent frame is the owning body's frame, e.g. `indoor_lab`) |
+| TF: `<rig_frame> → <cam_frame>` (`camera_body → cam0`) | `tf2_msgs/TFMessage` | broadcaster default | Camera extrinsic TF, always broadcast for each camera |
 
 `map → camera_body` is **not** broadcast (suppressed by
 `publish_tf: false` on the `camera_body` body).
 
 ### Services
 
-| Service           | Type                  | Purpose                                              |
-| ----------------- | --------------------- | ---------------------------------------------------- |
-| `~/replay`        | `std_srvs/Trigger`    | Re-run optimization over buffered frames             |
-| `~/dump`          | `std_srvs/Trigger`    | Write poses / calibration / diagnostics to disk      |
-| `~/plot`          | `std_srvs/Trigger`    | Dump factor graph to `graph.dot`                     |
+All three are created with relative names on the `tagslam` node (no
+namespace), so they resolve to `/replay`, `/dump`, `/plot`.
+
+| Service     | Type                  | Purpose                                              |
+| ----------- | --------------------- | ---------------------------------------------------- |
+| `/replay`   | `std_srvs/Trigger`    | Re-run optimization over buffered frames at `playback_rate` |
+| `/dump`     | `std_srvs/Trigger`    | Final optimization + write poses / calibration / diagnostics to `output_directory` and a bag |
+| `/plot`     | `std_srvs/Trigger`    | Dump factor graph to `graph.dot`                     |
 
 ## Configuration Files
 
-All three are required and live in
-`jetson_prod/config/drone/tagslam/`:
+These live in `jetson_prod/config/drone/tagslam/`. The bringup script
+(`start_tagslam()`) checks that `tagslam.yaml`, `cameras.yaml`, and
+`camera_poses.yaml` all exist and aborts otherwise.
+`template_for_calib_tagslam.yaml` is used only for offline map
+calibration. (In the node code, `tagslam_config` and `cameras` are
+mandatory; `camera_poses` may be empty.)
 
 | File              | Contents                                                                 |
 | ----------------- | ------------------------------------------------------------------------ |
 | `cameras.yaml`    | Single camera `cam0`: pinhole model, intrinsics `[fx, fy, cx, cy]`, radtan distortion, resolution, `image_topic`, `tag_topic` (`/tag_detections`), `rig_body: camera_body`. Intrinsics calibrated with kalibr (2026-01-21, source: `calib_01-camchain.yaml`). |
 | `camera_poses.yaml` | Pose of `cam0` relative to its `rig_body` (`camera_body`). Identity transform with information matrix `diag(1e6)` (fixed mount). |
-| `tagslam.yaml`    | `tagslam_parameters` (optimizer_mode, sync, noise), one static body `indoor_lab` with five floor tags (`22, 23, 24` at 0.15 m; `10, 21` at 0.20 m), one dynamic body `camera_body` (`publish_tf: false`, no odom). `amnesia: true`. |
-| `template_for_calib_tagslam.yaml` | Editable template used during AprilTag map calibration. Optimizer is set to `slow`, `amnesia` disabled. |
+| `tagslam.yaml`    | `tagslam_parameters` (`optimizer_mode: fast`, `minimum_tag_area: 2000`, `pixel_noise: 1.0`, `use_approximate_sync: true`, plus optimizer noise/error settings), `body_defaults`, one static body `indoor_lab` with five floor tags (`22, 23, 24` at 0.15 m; `10, 21` at 0.20 m), one dynamic body `camera_body` (`publish_tf: false`, no `odom_topic`). `amnesia: true`. |
+| `template_for_calib_tagslam.yaml` | Editable template used during AprilTag map calibration. `optimizer_mode: slow`, `amnesia` commented out (disabled), tags 21–24 at 0.15 m. |
 
 ### Tag-size invariant
 
@@ -132,10 +156,10 @@ only inside `cameras.yaml` (TagSLAM does **not** consume
 
 | Frame         | Defined by                            |
 | ------------- | ------------------------------------- |
-| `map`         | TagSLAM `fixed_frame_id` parameter (default `map`) |
-| `camera_body` | TagSLAM body name (rig body for cam0) |
-| `cam0`        | Camera frame, identity to `camera_body` per `camera_poses.yaml` |
-| `tag_<id>`    | Broadcast by TagSLAM under `map`      |
+| `map`         | TagSLAM `fixed_frame_id` parameter (default `map`); the fixed parent frame of all published body TFs (`map → <body_frame>`, e.g. `map → indoor_lab`). Note `camera_body.publish_tf=false`, so the `map → camera_body` link is suppressed; `indoor_lab` has no `publish_tf` key, so it defaults to `true` and `map → indoor_lab` is broadcast. |
+| `camera_body` | TagSLAM body frame for the rig body of `cam0` (frame id defaults to the body name) |
+| `cam0`        | Camera frame (frame id defaults to camera name `cam0`); broadcast as `camera_body → cam0`, identity per `camera_poses.yaml` |
+| `tag_<id>`    | Broadcast by TagSLAM with the owning body's frame as parent (e.g. `indoor_lab → tag_22`), not directly under `map` |
 
 `map → drone` is owned by `pose_corrector` (TagSLAM does not publish it).
 
